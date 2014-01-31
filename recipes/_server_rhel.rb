@@ -31,7 +31,13 @@ template 'initial-my.cnf' do
   owner 'root'
   group 'root'
   mode '0644'
+  notifies :run, 'execute[/usr/bin/mysql_install_db]', :immediately
   notifies :start, 'service[mysql-start]', :immediately
+end
+
+execute '/usr/bin/mysql_install_db' do
+  action :nothing
+  creates "#{node['mysql']['data_dir']}/mysql/user.frm"
 end
 
 # hax
@@ -40,11 +46,6 @@ service 'mysql-start' do
   action :nothing
 end
 
-execute '/usr/bin/mysql_install_db' do
-  action :run
-  creates '/var/lib/mysql/user.frm'
-  only_if { node['platform_version'].to_i < 6 }
-end
 
 cmd = assign_root_password_cmd
 execute 'assign-root-password' do
