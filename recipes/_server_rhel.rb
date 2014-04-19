@@ -32,6 +32,7 @@ template 'initial-my.cnf' do
   group 'root'
   mode '0644'
   notifies :run, 'execute[/usr/bin/mysql_install_db]', :immediately
+  notifies :run, 'bash[move mysql data to datadir]', :immediately
   notifies :start, 'service[mysql-start]', :immediately
 end
 
@@ -46,6 +47,20 @@ service 'mysql-start' do
   action :nothing
 end
 
+bash 'move mysql data to datadir' do
+  user 'root'
+  code <<-EOH
+  /usr/sbin/service #{node['mysql']['server']['service_name']} stop &&
+  mv /var/lib/mysql/* #{node['mysql']['data_dir']} &&
+  rm -rf /var/lib/mysql &&
+  ln -s #{node['mysql']['data_dir']} /var/lib/mysql &&
+  /usr/sbin/service #{node['mysql']['server']['service_name']} start
+  EOH
+  action :nothing
+  only_if "[ '/var/lib/mysql' != #{node['mysql']['data_dir']} ]"
+  only_if "[ `stat -c %h #{node['mysql']['data_dir']}` -eq 2 ]"
+  not_if '[ `stat -c %h /var/lib/mysql/` -eq 2 ]'
+end
 
 cmd = assign_root_password_cmd
 execute 'assign-root-password' do

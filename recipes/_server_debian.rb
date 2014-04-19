@@ -62,6 +62,8 @@ bash 'move mysql data to datadir' do
   code <<-EOH
   /usr/sbin/service mysql stop &&
   mv /var/lib/mysql/* #{node['mysql']['data_dir']} &&
+  rm -rf /var/lib/mysql &&
+  ln -s #{node['mysql']['data_dir']} /var/lib/mysql &&
   /usr/sbin/service mysql start
   EOH
   action :nothing
