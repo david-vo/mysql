@@ -33,7 +33,7 @@ template 'initial-my.cnf' do
   mode '0644'
   notifies :run, 'execute[/usr/bin/mysql_install_db]', :immediately
   notifies :run, 'bash[move mysql data to datadir]', :immediately
-  notifies :start, 'service[mysql-start]', :immediately
+  notifies :restart, 'service[mysql-start]', :immediately
 end
 
 # The /usr/bin/mysql_install_db command initializes the MySQL data directory and creates the system if they don't

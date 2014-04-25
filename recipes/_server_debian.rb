@@ -52,7 +52,7 @@ template '/etc/mysql/my.cnf' do
   mode '0644'
   notifies :install, 'package[mysql-server]', :immediately
   notifies :run, 'bash[move mysql data to datadir]', :immediately
-  notifies :restart, 'service[mysql]'
+  notifies :restart, 'service[mysql]', :immediately
 end
 
 # don't try this at home
