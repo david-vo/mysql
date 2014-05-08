@@ -51,8 +51,18 @@ template '/etc/mysql/my.cnf' do
   group 'root'
   mode '0644'
   notifies :install, 'package[mysql-server]', :immediately
+  notifies :run, 'execute[/usr/bin/mysql_install_db]', :immediately
   notifies :run, 'bash[move mysql data to datadir]', :immediately
   notifies :restart, 'service[mysql]', :immediately
+end
+
+# The /usr/bin/mysql_install_db command initializes the MySQL data directory and creates the system if they don't
+# exist. When the data directory is supposed to be moved, this command will attempt to initialize the data directory
+# on the new location and will fail. This command is only required for the initial installation.
+execute '/usr/bin/mysql_install_db' do
+  action :nothing
+  creates "#{node['mysql']['data_dir']}/mysql/user.frm"
+  only_if { node['mysql']['data_dir'] == '/var/lib/mysql' }
 end
 
 # don't try this at home
@@ -70,6 +80,13 @@ bash 'move mysql data to datadir' do
   only_if "[ '/var/lib/mysql' != #{node['mysql']['data_dir']} ]"
   only_if "[ `stat -c %h #{node['mysql']['data_dir']}` -eq 2 ]"
   not_if '[ `stat -c %h /var/lib/mysql/` -eq 2 ]'
+end
+
+cmd = assign_root_password_cmd
+execute 'assign-root-password' do
+  command cmd
+  action :run
+  only_if "/usr/bin/mysql -u root -e 'show databases;'"
 end
 
 #----
