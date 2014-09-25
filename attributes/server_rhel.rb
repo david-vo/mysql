@@ -11,11 +11,7 @@ when 'rhel'
   when 5
     default['mysql']['server']['packages'] = ['mysql-server']
     default['mysql']['server']['log_slow_queries']     = '/var/log/mysql/slow.log'
-  when 6
-    default['mysql']['server']['packages'] = ['mysql-server']
-    default['mysql']['server']['slow_query_log']       = 1
-    default['mysql']['server']['slow_query_log_file']  = '/var/log/mysql/slow.log'
-  when 7
+  when 6, 7
     default['mysql']['server']['packages'] = ['mysql-server']
     default['mysql']['server']['slow_query_log']       = 1
     default['mysql']['server']['slow_query_log_file']  = '/var/log/mysql/slow.log'
