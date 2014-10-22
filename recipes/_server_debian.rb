@@ -153,5 +153,5 @@ service 'mysql' do
   service_name 'mysql'
   supports     :status => true, :restart => true, :reload => true
   action       [:enable, :start]
-  provider     Chef::Provider::Service::Upstart
+  provider     Chef::Provider::Service::Upstart if node['platform'] == 'ubuntu'
 end
