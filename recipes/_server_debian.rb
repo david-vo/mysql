@@ -151,10 +151,12 @@ service 'apparmor-mysql' do
   supports :reload => true
 end
 
+service_provider = Chef::Provider::Service::Upstart if 'ubuntu' == node['platform'] &&
+  Chef::VersionConstraint.new('>= 13.10').include?(node['platform_version'])
 
 service 'mysql' do
   service_name node['mysql']['server']['service_name']
   supports     :status => true, :restart => true, :reload => true
-  action       [:enable, :start]
-  provider     Chef::Provider::Service::Upstart if node['platform'] == 'ubuntu'
+  action       [:enable,:start]
+  #provider     service_provider
 end

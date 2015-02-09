@@ -23,8 +23,7 @@ pre-start script
     LC_ALL=C BLOCKSIZE= df --portability <%= node['mysql']['data_dir'] %>/. | tail -n 1 | awk '{ exit ($4<4096) }'
 end script
 
-exec /usr/sbin/mysqld --defaults-file=<%=@defaults_file%>
-<%#= "#{}--defaults-file=#{@defaults_file}" if @defaults_file %>
+exec /usr/sbin/mysqld --defaults-file=<%= @defaults_file %> 
 
 post-start script
     for i in `seq 1 30` ; do
