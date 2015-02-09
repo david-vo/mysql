@@ -31,7 +31,7 @@ end
 #
 node['mysql']['server']['packages'].each do |name|
   package name do
-    action name == 'mysql-server' ? :nothing : :install
+    action  :install
   end
 end
 
@@ -50,9 +50,9 @@ template '/etc/mysql/my.cnf' do
   owner 'root'
   group 'root'
   mode '0644'
-  notifies :install, 'package[mysql-server]', :immediately
   notifies :run, 'execute[/usr/bin/mysql_install_db]', :immediately
   notifies :run, 'bash[move mysql data to datadir]', :immediately
+  notifies :create, 'template[/etc/init/mysql.conf]', :immediately
   notifies :restart, 'service[mysql]', :immediately
 end
 
@@ -133,7 +133,7 @@ end
 
 template '/etc/init/mysql.conf' do
   source 'init-mysql.conf.erb'
-  only_if { node['platform_family'] == 'ubuntu' }
+  variables(:defaults_file=>"/etc/mysql/my.cnf")
 end
 
 template '/etc/apparmor.d/usr.sbin.mysqld' do
@@ -148,10 +148,12 @@ service 'apparmor-mysql' do
   supports :reload => true
 end
 
+service_provider = Chef::Provider::Service::Upstart if 'ubuntu' == node['platform'] &&
+  Chef::VersionConstraint.new('>= 13.10').include?(node['platform_version'])
 
 service 'mysql' do
-  service_name 'mysql'
+  service_name node['mysql']['server']['service_name']
   supports     :status => true, :restart => true, :reload => true
-  action       [:enable, :start]
-  provider     Chef::Provider::Service::Upstart if node['platform'] == 'ubuntu'
+  action       [:enable,:start]
+  #provider     service_provider
 end
