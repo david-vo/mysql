@@ -24,9 +24,13 @@ end
 #----
 # Install software
 #----
+
+# look for the server package and skip now and install later.  
+# find the server package and use that to install.
+server_package = node['mysql']['server']['packages'].select{|p| p =~ /server/}.first
 node['mysql']['server']['packages'].each do |name|
   package name do
-    action :install
+    action name == server_package ? :nothing : :install
   end
 end
 
@@ -38,6 +42,51 @@ node['mysql']['server']['directories'].each do |key, value|
     action    :create
     recursive true
   end
+end
+
+template '/etc/mysql/my.cnf' do
+  source 'my.cnf.erb'
+  owner 'root'
+  group 'root'
+  mode '0644'
+  notifies :install, "package[#{server_package}]", :immediately
+  notifies :run, 'execute[/usr/bin/mysql_install_db]', :immediately
+  notifies :run, 'bash[move mysql data to datadir]', :immediately
+  notifies :create, 'template[/etc/init/mysql.conf]', :immediately
+  notifies :restart, 'service[mysql]', :immediately
+end
+
+# The /usr/bin/mysql_install_db command initializes the MySQL data directory and creates the system if they don't
+# exist. When the data directory is supposed to be moved, this command will attempt to initialize the data directory
+# on the new location and will fail. This command is only required for the initial installation.
+execute '/usr/bin/mysql_install_db' do
+  action :nothing
+  creates "#{node['mysql']['data_dir']}/mysql/user.frm"
+  only_if { node['mysql']['data_dir'] == '/var/lib/mysql' }
+end
+
+# don't try this at home
+# http://ubuntuforums.org/showthread.php?t=804126
+bash 'move mysql data to datadir' do
+  user 'root'
+  code <<-EOH
+  /usr/sbin/service mysql stop &&
+  mv /var/lib/mysql/* #{node['mysql']['data_dir']} &&
+  rm -rf /var/lib/mysql &&
+  ln -s #{node['mysql']['data_dir']} /var/lib/mysql &&
+  /usr/sbin/service mysql start
+  EOH
+  action :nothing
+  only_if "[ '/var/lib/mysql' != #{node['mysql']['data_dir']} ]"
+  only_if "[ `stat -c %h #{node['mysql']['data_dir']}` -eq 2 ]"
+  not_if '[ `stat -c %h /var/lib/mysql/` -eq 2 ]'
+end
+
+cmd = assign_root_password_cmd
+execute 'assign-root-password' do
+  command cmd
+  action :run
+  only_if "/usr/bin/mysql -u root -e 'show databases;'"
 end
 
 #----
@@ -82,9 +131,12 @@ directory node['mysql']['data_dir'] do
   recursive true
 end
 
+# mysql  doesn't need the defaults file supplied.  Percona (and possibly others do)
+#defaults_file = !["mysql"].include?(node['mysql']['server']['packages']) ? "/etc/mysql/my.cnf": nil
 template '/etc/init/mysql.conf' do
   source 'init-mysql.conf.erb'
-  only_if { node['platform_family'] == 'ubuntu' }
+  only_if { node['platform_family'] == 'debian' }
+  variables(:defaults_file=>"/etc/mysql/my.cnf")
 end
 
 template '/etc/apparmor.d/usr.sbin.mysqld' do
@@ -99,32 +151,10 @@ service 'apparmor-mysql' do
   supports :reload => true
 end
 
-template '/etc/mysql/my.cnf' do
-  source 'my.cnf.erb'
-  owner 'root'
-  group 'root'
-  mode '0644'
-  notifies :run, 'bash[move mysql data to datadir]', :immediately
-  notifies :reload, 'service[mysql]'
-end
-
-# don't try this at home
-# http://ubuntuforums.org/showthread.php?t=804126
-bash 'move mysql data to datadir' do
-  user 'root'
-  code <<-EOH
-  /usr/sbin/service mysql stop &&
-  mv /var/lib/mysql/* #{node['mysql']['data_dir']} &&
-  /usr/sbin/service mysql start
-  EOH
-  action :nothing
-  only_if "[ '/var/lib/mysql' != #{node['mysql']['data_dir']} ]"
-  only_if "[ `stat -c %h #{node['mysql']['data_dir']}` -eq 2 ]"
-  not_if '[ `stat -c %h /var/lib/mysql/` -eq 2 ]'
-end
 
 service 'mysql' do
-  service_name 'mysql'
+  service_name node['mysql']['server']['service_name']
   supports     :status => true, :restart => true, :reload => true
   action       [:enable, :start]
+  provider     Chef::Provider::Service::Upstart if node['platform'] == 'ubuntu'
 end
