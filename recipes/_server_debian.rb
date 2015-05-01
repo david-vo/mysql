@@ -158,5 +158,5 @@ service 'mysql' do
   service_name node['mysql']['server']['service_name']
   supports     :status => true, :restart => true, :reload => true
   action       [:enable,:start]
-  provider     service_provider
+  #provider     service_provider
 end
