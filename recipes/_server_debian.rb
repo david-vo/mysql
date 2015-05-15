@@ -24,7 +24,12 @@ end
 #----
 # Install software
 #----
-
+# Do not install the 'mysql-server' package here as it should be installed after
+# the my.cnf file is created. This is required in order to have the innodb log file
+# created with the correct size set in my.cnf. The :install action of
+# package[mysql-server] resource is notified by the template[/etc/mysql/my.cnf].
+#
+# Support for mysql compatible packages:
 # look for the server package and skip now and install later.  
 # find the server package and use that to install.
 server_package = node['mysql']['server']['packages'].select{|p| p =~ /server/}.first
