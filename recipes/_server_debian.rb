@@ -29,9 +29,13 @@ end
 # created with the correct size set in my.cnf. The :install action of
 # package[mysql-server] resource is notified by the template[/etc/mysql/my.cnf].
 #
+# Support for mysql compatible packages:
+# look for the server package and skip now and install later.  
+# find the server package and use that to install.
+server_package = node['mysql']['server']['packages'].select{|p| p =~ /server/}.first
 node['mysql']['server']['packages'].each do |name|
   package name do
-    action name == 'mysql-server' ? :nothing : :install
+    action name == server_package ? :nothing : :install
   end
 end
 
@@ -50,9 +54,10 @@ template '/etc/mysql/my.cnf' do
   owner 'root'
   group 'root'
   mode '0644'
-  notifies :install, 'package[mysql-server]', :immediately
+  notifies :install, "package[#{server_package}]", :immediately
   notifies :run, 'execute[/usr/bin/mysql_install_db]', :immediately
   notifies :run, 'bash[move mysql data to datadir]', :immediately
+  notifies :create, 'template[/etc/init/mysql.conf]', :immediately
   notifies :restart, 'service[mysql]', :immediately
 end
 
@@ -131,9 +136,12 @@ directory node['mysql']['data_dir'] do
   recursive true
 end
 
+# mysql  doesn't need the defaults file supplied.  Percona (and possibly others do)
+#defaults_file = !["mysql"].include?(node['mysql']['server']['packages']) ? "/etc/mysql/my.cnf": nil
 template '/etc/init/mysql.conf' do
   source 'init-mysql.conf.erb'
-  only_if { node['platform_family'] == 'ubuntu' }
+  only_if { node['platform_family'] == 'debian' }
+  variables(:defaults_file=>"/etc/mysql/my.cnf")
 end
 
 template '/etc/apparmor.d/usr.sbin.mysqld' do
@@ -150,7 +158,7 @@ end
 
 
 service 'mysql' do
-  service_name 'mysql'
+  service_name node['mysql']['server']['service_name']
   supports     :status => true, :restart => true, :reload => true
   action       [:enable, :start]
   provider     Chef::Provider::Service::Upstart if node['platform'] == 'ubuntu'
