@@ -52,6 +52,11 @@ bash 'move mysql data to datadir' do
   mv /var/lib/mysql/* #{node['mysql']['data_dir']} &&
   rm -rf /var/lib/mysql &&
   ln -s #{node['mysql']['data_dir']} /var/lib/mysql &&
+  #setup selinux policy if selinux is enforcing.
+  if [ `getenforce` == "Enforcing" ];then
+  semanage fcontext -a -t mysqld_db_t "#{node['mysql']['data_dir']}(/.*)?"
+  restorecon -Rv #{node['mysql']['data_dir']}
+  fi
   /sbin/service #{node['mysql']['server']['service_name']} start
   EOH
   action :nothing
