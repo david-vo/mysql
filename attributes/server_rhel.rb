@@ -42,4 +42,5 @@ when 'rhel'
   # RHEL/CentOS mysql package does not support this option.
   default['mysql']['tunable']['innodb_adaptive_flushing'] = false
   default['mysql']['server']['skip_federated'] = false
+  default['mysql']['tunable']['log-error'] = '/var/log/mysql/error.log'
 end
