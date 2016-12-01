@@ -11,7 +11,7 @@ when 'rhel'
   when 5
     default['mysql']['server']['packages'] = ['mysql-server']
     default['mysql']['server']['log_slow_queries']     = '/var/log/mysql/slow.log'
-  when 6
+  when 6, 7
     default['mysql']['server']['packages'] = ['mysql-server']
     default['mysql']['server']['slow_query_log']       = 1
     default['mysql']['server']['slow_query_log_file']  = '/var/log/mysql/slow.log'
@@ -42,4 +42,5 @@ when 'rhel'
   # RHEL/CentOS mysql package does not support this option.
   default['mysql']['tunable']['innodb_adaptive_flushing'] = false
   default['mysql']['server']['skip_federated'] = false
+  default['mysql']['tunable']['log-error'] = '/var/log/mysql/error.log'
 end

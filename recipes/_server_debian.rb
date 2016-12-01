@@ -24,9 +24,14 @@ end
 #----
 # Install software
 #----
+# Do not install the 'mysql-server' package here as it should be installed after
+# the my.cnf file is created. This is required in order to have the innodb log file
+# created with the correct size set in my.cnf. The :install action of
+# package[mysql-server] resource is notified by the template[/etc/mysql/my.cnf].
+#
 node['mysql']['server']['packages'].each do |name|
   package name do
-    action :install
+    action name == 'mysql-server' ? :nothing : :install
   end
 end
 
@@ -38,6 +43,50 @@ node['mysql']['server']['directories'].each do |key, value|
     action    :create
     recursive true
   end
+end
+
+template '/etc/mysql/my.cnf' do
+  source 'my.cnf.erb'
+  owner 'root'
+  group 'root'
+  mode '0644'
+  notifies :install, 'package[mysql-server]', :immediately
+  notifies :run, 'execute[/usr/bin/mysql_install_db]', :immediately
+  notifies :run, 'bash[move mysql data to datadir]', :immediately
+  notifies :restart, 'service[mysql]', :immediately
+end
+
+# The /usr/bin/mysql_install_db command initializes the MySQL data directory and creates the system if they don't
+# exist. When the data directory is supposed to be moved, this command will attempt to initialize the data directory
+# on the new location and will fail. This command is only required for the initial installation.
+execute '/usr/bin/mysql_install_db' do
+  action :nothing
+  creates "#{node['mysql']['data_dir']}/mysql/user.frm"
+  only_if { node['mysql']['data_dir'] == '/var/lib/mysql' }
+end
+
+# don't try this at home
+# http://ubuntuforums.org/showthread.php?t=804126
+bash 'move mysql data to datadir' do
+  user 'root'
+  code <<-EOH
+  /usr/sbin/service mysql stop &&
+  mv /var/lib/mysql/* #{node['mysql']['data_dir']} &&
+  rm -rf /var/lib/mysql &&
+  ln -s #{node['mysql']['data_dir']} /var/lib/mysql &&
+  /usr/sbin/service mysql start
+  EOH
+  action :nothing
+  only_if "[ '/var/lib/mysql' != #{node['mysql']['data_dir']} ]"
+  only_if "[ `stat -c %h #{node['mysql']['data_dir']}` -eq 2 ]"
+  not_if '[ `stat -c %h /var/lib/mysql/` -eq 2 ]'
+end
+
+cmd = assign_root_password_cmd
+execute 'assign-root-password' do
+  command cmd
+  action :run
+  only_if "/usr/bin/mysql -u root -e 'show databases;'"
 end
 
 #----
@@ -99,32 +148,10 @@ service 'apparmor-mysql' do
   supports :reload => true
 end
 
-template '/etc/mysql/my.cnf' do
-  source 'my.cnf.erb'
-  owner 'root'
-  group 'root'
-  mode '0644'
-  notifies :run, 'bash[move mysql data to datadir]', :immediately
-  notifies :reload, 'service[mysql]'
-end
-
-# don't try this at home
-# http://ubuntuforums.org/showthread.php?t=804126
-bash 'move mysql data to datadir' do
-  user 'root'
-  code <<-EOH
-  /usr/sbin/service mysql stop &&
-  mv /var/lib/mysql/* #{node['mysql']['data_dir']} &&
-  /usr/sbin/service mysql start
-  EOH
-  action :nothing
-  only_if "[ '/var/lib/mysql' != #{node['mysql']['data_dir']} ]"
-  only_if "[ `stat -c %h #{node['mysql']['data_dir']}` -eq 2 ]"
-  not_if '[ `stat -c %h /var/lib/mysql/` -eq 2 ]'
-end
 
 service 'mysql' do
   service_name 'mysql'
   supports     :status => true, :restart => true, :reload => true
   action       [:enable, :start]
+  provider     Chef::Provider::Service::Upstart if node['platform'] == 'ubuntu'
 end
