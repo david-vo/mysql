@@ -136,6 +136,9 @@ query_cache_size        = <%= node['mysql']['tunable']['query_cache_size'] %>
 <%- if node['mysql']['tunable']['log_error'] %>
 log_error = <%= node['mysql']['tunable']['log_error'] %>
 <%- end %>
+<%- if node['mysql']['tunable']['log-error'] %>
+log-error = <%= node['mysql']['tunable']['log-error'] %>
+<%- end %>
 <%- if node['mysql']['tunable']['log_warnings'] %>
 log_warnings
 <%- end %>
