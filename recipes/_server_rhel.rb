@@ -45,6 +45,30 @@ execute '/usr/bin/mysql_install_db' do
   only_if { node['mysql']['data_dir'] == '/var/lib/mysql' }
 end
 
+cookbook_file ::File.join(Chef::Config[:file_cache_path], 'rhel-mysql.pp') do
+  source 'rhel-mysql.pp'
+  owner 'root'
+  group 'root'
+  mode '0644'
+  action :create
+end
+
+cookbook_file ::File.join(Chef::Config[:file_cache_path], 'rhel-mysql.te') do
+  source 'rhel-mysql.te'
+  owner 'root'
+  group 'root'
+  mode '0644'
+  action :create
+end
+
+execute 'fix selinux' do
+  command "semodule -i #{::File.join(Chef::Config[:file_cache_path], 'rhel-mysql.pp')}"
+  action :run
+  only_if do
+    `/usr/sbin/getenforce`.strip.downcase == 'enforcing'
+  end
+end
+
 bash 'move mysql data to datadir' do
   user 'root'
   code <<-EOH
@@ -52,11 +76,6 @@ bash 'move mysql data to datadir' do
   mv /var/lib/mysql/* #{node['mysql']['data_dir']} &&
   rm -rf /var/lib/mysql &&
   ln -s #{node['mysql']['data_dir']} /var/lib/mysql &&
-  #setup selinux policy if selinux is enforcing.
-  if [ `getenforce` == "Enforcing" ];then
-  semanage fcontext -a -t mysqld_db_t "#{node['mysql']['data_dir']}(/.*)?"
-  restorecon -Rv #{node['mysql']['data_dir']}
-  fi
   /sbin/service #{node['mysql']['server']['service_name']} start
   EOH
   action :nothing
